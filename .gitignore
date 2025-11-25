@@ -1,0 +1,24 @@
+# Xcode
+.DS_Store
+*/build/
+*.derivedData
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.headermap
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Other
+*.swp
+*~
+.gemini/
