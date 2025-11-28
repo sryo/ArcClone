@@ -10,40 +10,66 @@ enum SuggestionType: String {
 }
 
 struct SuggestionItem: Identifiable, Hashable {
-    var id: String {
-        return "\(type.rawValue)_\(url?.absoluteString ?? "")_\(title)"
-    }
+    let id: UUID
     let title: String
     let url: URL?
     let type: SuggestionType
     let icon: String
+    var description: String? = nil
+    var imageURL: URL? = nil
+    
+    init(title: String, url: URL?, type: SuggestionType, icon: String, description: String? = nil, imageURL: URL? = nil) {
+        self.id = UUID()
+        self.title = title
+        self.url = url
+        self.type = type
+        self.icon = icon
+        self.description = description
+        self.imageURL = imageURL
+    }
 }
 
 @MainActor
 class SuggestionService: ObservableObject {
     @Published var suggestions: [SuggestionItem] = []
+    private var fetchTask: Task<Void, Never>?
     
     func fetchSuggestions(for query: String, modelContext: ModelContext) {
+        fetchTask?.cancel()
         guard !query.isEmpty else {
             self.suggestions = []
             return
         }
         
-        Task {
-            var newSuggestions: [SuggestionItem] = []
-            let lowerQuery = query.lowercased()
+        fetchTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
             
-            // 1. Active & Pinned Tabs (Switch to Tab)
-            // We need to fetch spaces from the context
-            let descriptor = FetchDescriptor<BrowserSpace>()
-            if let spaces = try? modelContext.fetch(descriptor), let space = spaces.first {
-                let allTabs = space.pinnedTabs + space.todayTabs
-                let matchingTabs = allTabs.filter { tab in
-                    tab.title.lowercased().contains(lowerQuery) ||
-                    tab.url.absoluteString.lowercased().contains(lowerQuery)
-                }
+            let results = await buildSuggestions(for: query, modelContext: modelContext)
+            guard !Task.isCancelled else { return }
+            self.suggestions = results
+        }
+    }
+    
+    private func buildSuggestions(for query: String, modelContext: ModelContext) async -> [SuggestionItem] {
+        var newSuggestions: [SuggestionItem] = []
+        var seenURLs = Set<String>() // Track normalized URLs to prevent duplicates
+        let lowerQuery = query.lowercased()
+        
+        let descriptor = FetchDescriptor<BrowserSpace>()
+        if let spaces = try? modelContext.fetch(descriptor), let space = spaces.first {
+            let allTabs = space.pinnedTabs + space.todayTabs
+            let matchingTabs = allTabs.filter { tab in
+                tab.title.lowercased().contains(lowerQuery) ||
+                tab.url.absoluteString.lowercased().contains(lowerQuery)
+            }
+            
+            for tab in matchingTabs {
+                let normalizedURL = normalizedURLString(from: tab.url)
                 
-                for tab in matchingTabs {
+                // Only add if we haven't seen this URL before
+                if !seenURLs.contains(normalizedURL) {
+                    seenURLs.insert(normalizedURL)
                     newSuggestions.append(SuggestionItem(
                         title: tab.title,
                         url: tab.url,
@@ -52,55 +78,93 @@ class SuggestionService: ObservableObject {
                     ))
                 }
             }
+        }
+        
+        let historyDescriptor = FetchDescriptor<HistoryEntry>(
+            predicate: #Predicate<HistoryEntry> { entry in
+                entry.title?.localizedStandardContains(query) == true ||
+                entry.urlString.localizedStandardContains(query) == true
+            },
+            sortBy: [SortDescriptor(\.visitDate, order: .reverse)]
+        )
+        
+        // Fetch more items initially to allow for deduplication
+        var historyItems: [HistoryEntry] = []
+        if let history = try? modelContext.fetch(historyDescriptor) {
+            historyItems = Array(history.prefix(50))
+        }
+        
+        var addedHistoryCount = 0
+        for entry in historyItems {
+            guard addedHistoryCount < 5 else { break }
+            guard let entryURL = URL(string: entry.urlString) else { continue }
+            let normalizedURL = normalizedURLString(from: entryURL)
             
-            // 2. History
-            // Fetch history entries matching query
-            let historyDescriptor = FetchDescriptor<HistoryEntry>(
-                predicate: #Predicate<HistoryEntry> { entry in
-                    entry.title?.localizedStandardContains(query) == true ||
-                    entry.urlString.localizedStandardContains(query) == true
-                },
-                sortBy: [SortDescriptor(\.visitDate, order: .reverse)]
-            )
-            // Limit to 5 history items
-            var historyItems: [HistoryEntry] = []
-            if let history = try? modelContext.fetch(historyDescriptor) {
-                historyItems = Array(history.prefix(5))
+            // Only add if we haven't seen this URL before
+            if !seenURLs.contains(normalizedURL) {
+                seenURLs.insert(normalizedURL)
+                newSuggestions.append(SuggestionItem(
+                    title: entry.title ?? entry.urlString,
+                    url: entryURL,
+                    type: .history,
+                    icon: "clock"
+                ))
+                addedHistoryCount += 1
             }
-            
-            for entry in historyItems {
-                // Avoid duplicates if already in tabs
-                if !newSuggestions.contains(where: { $0.url == entry.url }) {
-                    newSuggestions.append(SuggestionItem(
-                        title: entry.title ?? entry.urlString,
-                        url: entry.url,
-                        type: .history,
-                        icon: "clock"
-                    ))
-                }
-            }
-            
-            // 3. Google Suggestions
-            let urlString = "http://suggestqueries.google.com/complete/search?client=firefox&q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-            if let url = URL(string: urlString) {
-                if let (data, _) = try? await URLSession.shared.data(from: url) {
-                    if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any],
-                       json.count > 1,
-                       let googleSuggestions = json[1] as? [String] {
-                        
-                        for suggestion in googleSuggestions.prefix(5) {
-                            newSuggestions.append(SuggestionItem(
-                                title: suggestion,
-                                url: nil, // Search query
-                                type: .search,
-                                icon: "magnifyingglass"
-                            ))
+        }
+        
+        // Use a client that returns rich data if possible, or just parse what we can.
+        // Google's 'chrome' client returns JSON with more details.
+        let urlString = "https://suggestqueries.google.com/complete/search?client=chrome&q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        if let url = URL(string: urlString) {
+            if let (data, _) = try? await URLSession.shared.data(from: url) {
+                if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any],
+                   json.count > 1,
+                   let suggestionsList = json[1] as? [String] {
+                    
+                    // The 'chrome' client returns: [query, [suggestions], [descriptions], [], [types], ...]
+                    // Index 2 might contain descriptions/URLs.
+                    let descriptions = (json.count > 2) ? (json[2] as? [String]) : nil
+                    
+                    for (index, suggestion) in suggestionsList.prefix(5).enumerated() {
+                        var desc: String? = nil
+                        if let descs = descriptions, index < descs.count, !descs[index].isEmpty {
+                            desc = descs[index]
                         }
+                        
+                        newSuggestions.append(SuggestionItem(
+                            title: suggestion,
+                            url: nil,
+                            type: .search,
+                            icon: "magnifyingglass",
+                            description: desc
+                        ))
                     }
                 }
             }
-            
-            self.suggestions = newSuggestions
         }
+        
+        return newSuggestions
+    }
+    
+    private func normalizedURLString(from url: URL) -> String {
+        var string = url.absoluteString.lowercased()
+        
+        // Remove scheme
+        if let schemeRange = string.range(of: "://") {
+            string.removeSubrange(..<schemeRange.upperBound)
+        }
+        
+        // Remove www.
+        if string.hasPrefix("www.") {
+            string.removeFirst(4)
+        }
+        
+        // Remove trailing slash
+        if string.hasSuffix("/") {
+            string.removeLast()
+        }
+        
+        return string
     }
 }

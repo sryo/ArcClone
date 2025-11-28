@@ -1,56 +1,105 @@
-# ArcClone - How It Works
+# ArcClone - Roadmap v2
 
 A browser built with Swift, SwiftUI, and WebKit that reimagines web browsing with spaces and pinned tabs.
 
-## Data Models (SwiftData)
+## ✅ Completed Features (v1)
 
-**BrowserSpace** - A workspace containing:
-- Pinned tabs (persistent apps)
-- Today tabs (current browsing)
-- Archived tabs (older than 12 hours)
-- Name, color, and optional emoji icon
+- **Spaces & Tabs**: Workspaces with pinned/today tabs, archiving
+- **Profiles**: Isolated browsing data per space
+- **Command Palette**: Rich search with suggestions
+- **Library**: Downloads, archived tabs, space management
+- **Media Integration**: Audio indicators + Now Playing controls
+- **Onboarding**: First-run experience with welcome guide
+- **UI Polish**: Theme picker, toolbar styling, download animations
+- **System Integration**: Passwords, ad blocking
 
-**BrowserTab** - A web page containing:
-- URL, title, favicon
-- Navigation state (canGoBack/canGoForward)
-- Pinned status
-- Folder support with children tabs
-- Optional emoji icon
+## 🎯 Upcoming Features
 
-**HistoryEntry** - URL visit tracking with timestamps
+### 1. Advanced Tab Management
+- [ ] **Tab Search**: Search across all tabs in Command Palette
+- [ ] **Tab Preview**: Hover preview thumbnails for tabs
+- [ ] **Recently Closed**: Quick access to recently closed tabs
+- [ ] **Tab Suspension**: Auto-suspend inactive tabs to save memory
+- [ ] **Bulk Actions**: Multi-select tabs for batch operations
 
-## WebEngine (Singleton)
+### 2. Enhanced Productivity
+- [ ] **Split View**: View two tabs side-by-side
+- [ ] **Picture-in-Picture**: Detachable video player
+- [ ] **Reading Mode**: Clean, distraction-free article reading
+- [ ] **Focus Mode**: Hide sidebar/chrome for immersive browsing
+- [ ] **Quick Notes**: Take notes linked to specific tabs/sites
 
-The `WebEngine` manages all web views:
-- Keeps WKWebView instances alive per tab (cached by `tabID_contextID`)
-- Handles navigation and URL updates
-- Implements pinned tab behavior: clicking links in pinned tabs opens them in new Today tabs
-- Updates tab metadata when pages load
+### 3. Search & Navigation
+- [ ] **History Search**: Full history search in Command Palette
+- [ ] **Quick Actions**: Custom keyboard shortcuts for common tasks
+- [ ] **Page Search**: Enhanced find-in-page with highlighting
+- [ ] **URL Suggestions**: Smart URL completion from history
 
-## User Interface
+### 4. Privacy & Security
+- [ ] **Cookie Manager**: View and manage cookies per site
 
-**Main View** - `NavigationSplitView` with:
-- Sidebar: Spaces selector, pinned tabs, today tabs
-- Detail: Active tab's web content
-- Library mode: Archived tabs, spaces overview, media, downloads
+### 5. Sync & Backup
+- [ ] **iCloud Sync**: Sync spaces/tabs across devices
+- [ ] **Session Export**: Export/import spaces and tabs
+- [ ] **Crash Recovery**: Auto-save and restore sessions
+- [ ] **Scheduled Backups**: Automated space backups
 
-**Command Palette** - Cmd+L opens:
-- URL entry and web search
-- Live suggestions from open tabs and history
-- Quick navigation
+### 6. Developer Tools
+- [ ] **Console Access**: Quick access to Web Inspector
+- [ ] **User Agent Switcher**: Test different user agents
 
-**Features**:
-- Drag & drop tabs between pinned/today sections
-- Move tabs between spaces
-- Rename tabs and spaces
-- Close tabs with archive history (Cmd+Shift+T to reopen)
-- Back/forward navigation buttons
-- Library view (Cmd+Shift+L)
+### 7. Customization
+- [ ] **Custom CSS**: Inject CSS per site
+- [ ] **User Scripts**: JavaScript injection per site
+- [ ] **Search Engines**: Manage custom search providers
 
-## Key Behaviors
+### 8. Performance
+- [ ] **Tab Lazy Loading**: Load tabs only when viewed
+- [ ] **Memory Limits**: Set memory caps per tab
+- [ ] **Background Tab Throttling**: Reduce resource usage
+- [ ] **Preload Predictions**: Preload likely next pages
+- [ ] **Cache Management**: Manual cache control
 
-1. **Pinned tabs** act like apps - links to different domains open in new Today tabs
-2. **Today tabs** auto-archive after 12 hours
-3. **Web views** are cached and reused per window context
-4. **Spaces** separate work/personal/project browsing
-5. **Library** provides access to archived tabs and space management
+### 10. Collaboration
+- [ ] **Share Spaces**: Export space as shareable link
+- [ ] **Tab Sharing**: Quick share current tab
+- [ ] **Collaborative Spaces**: Real-time shared spaces
+- [ ] **Comments**: Add notes/comments to tabs
+
+## 🏗️ Architecture Improvements
+
+### Core Infrastructure
+- [ ] **Tab Virtualization**: Efficient rendering of large tab counts
+- [ ] **Worker Threads**: Offload heavy operations
+- [ ] **Database Optimization**: Faster queries for history/bookmarks
+- [ ] **Lazy Data Loading**: Load data only when needed
+- [ ] **Error Boundaries**: Graceful error handling
+
+### Testing & Quality
+- [ ] **Unit Tests**: Core logic coverage
+- [ ] **UI Tests**: Automated UI testing
+- [ ] **Performance Monitoring**: Track metrics
+- [ ] **Crash Reporting**: Automated crash analysis
+
+## 📱 Platform Features
+
+### macOS Integration
+- [ ] **Handoff**: Continue browsing on iOS
+- [ ] **Shortcuts**: Integrate with macOS Shortcuts
+- [ ] **Share Sheet**: Quick sharing to apps
+- [ ] **Notification Center**: Tab notifications
+- [ ] **Spotlight**: Search tabs from Spotlight
+
+### Visual Polish
+- [ ] **SF Symbols**: Use latest SF Symbols
+- [ ] **Animations**: More fluid transitions
+- [ ] **Haptics**: Feedback on trackpad
+- [ ] **Glass Effects**: More Liquid Glass inspired by the sample code
+
+## Technical Debt
+
+- [ ] Refactor WebEngine for better modularity
+- [ ] Improve SwiftData migration strategy
+- [ ] Add comprehensive error handling
+- [ ] Document public APIs
+- [ ] Performance profiling and optimization

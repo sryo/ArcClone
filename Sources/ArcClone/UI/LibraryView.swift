@@ -19,28 +19,41 @@ enum LibrarySection: String, CaseIterable, Identifiable {
 }
 
 struct LibrarySidebar: View {
-    @Binding var selectedSection: LibrarySection?
-    @Binding var isPresented: Bool
+    var onBack: () -> Void
+    var onSelectSection: (LibrarySection) -> Void
     
     var body: some View {
         VStack {
             HStack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                
                 Text("Library")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .padding(.leading, 8)
+                
                 Spacer()
-                Button("Done") {
-                    isPresented = false
-                }
-                .buttonStyle(.plain)
             }
             .padding()
             
-            List(LibrarySection.allCases, selection: $selectedSection) { section in
-                NavigationLink(value: section) {
+            List(LibrarySection.allCases) { section in
+                Button(action: { onSelectSection(section) }) {
                     Label(section.rawValue, systemImage: section.icon)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
             }
+            .listStyle(.sidebar)
             
             Spacer()
             
@@ -68,9 +81,9 @@ struct LibraryContent: View {
         if let section = section {
             switch section {
             case .media:
-                ContentUnavailableView("Media", systemImage: "photo.on.rectangle", description: Text("Images, videos, and screenshots will appear here."))
+                MediaGridView()
             case .downloads:
-                ContentUnavailableView("Downloads", systemImage: "arrow.down.circle", description: Text("Your downloaded files will appear here."))
+                DownloadsView()
             case .spaces:
                 SpacesListView(spaces: spaces)
             case .archivedTabs:
@@ -102,6 +115,7 @@ struct SpacesListView: View {
                 }
             }
         }
+        .listStyle(.sidebar)
     }
 }
 
@@ -128,5 +142,60 @@ struct ArchivedTabsView: View {
                 }
             }
         }
+        .listStyle(.sidebar)
     }
 }
+
+struct DownloadsView: View {
+    @ObservedObject var downloadManager = DownloadManager.shared
+    
+    var body: some View {
+        List {
+            if downloadManager.downloads.isEmpty {
+                ContentUnavailableView("No Downloads", systemImage: "arrow.down.circle", description: Text("Your downloaded files will appear here."))
+            } else {
+                ForEach(downloadManager.groupedDownloads, id: \.group) { groupData in
+                    DisclosureGroup(groupData.group.rawValue) {
+                        ForEach(groupData.items) { item in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(item.filename)
+                                        .font(.headline)
+                                    
+                                    if item.state == .downloading {
+                                        ProgressView(value: item.progress)
+                                            .progressViewStyle(.linear)
+                                    } else if case .failed(let error) = item.state {
+                                        Text(error.localizedDescription)
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                    } else {
+                                        Text("Completed")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                if item.state == .finished {
+                                    Button(action: {
+                                        if let url = item.destinationURL {
+                                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                                        }
+                                    }) {
+                                        Image(systemName: "magnifyingglass")
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.sidebar)
+    }
+}
+

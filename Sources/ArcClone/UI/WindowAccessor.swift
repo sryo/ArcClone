@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct WindowAccessor: NSViewRepresentable {
+    var onWindowFound: ((NSWindow) -> Void)?
+    
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
@@ -17,12 +19,12 @@ struct WindowAccessor: NSViewRepresentable {
             window.standardWindowButton(.closeButton)?.isHidden = false
             
             // Explicitly remove the toolbar to ensure no toolbar background or items are shown
-            window.toolbar = nil
+            // window.toolbar = nil
             
             window.isMovableByWindowBackground = true
             
-            // Optional: Adjust traffic light position if needed (requires more complex NSWindow subclassing usually, 
-            // but default position in fullSizeContentView is usually top-left of window)
+            // Notify parent
+            onWindowFound?(window)
         }
         return view
     }
